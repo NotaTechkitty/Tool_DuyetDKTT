@@ -1,0 +1,19 @@
+{
+  "name": "c3-dktt-tool",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chromedriver": "^111.0.0",
+    "gecko": "^0.0.0",
+    "moment": "^2.29.4",
+    "prompt-sync": "^4.2.0",
+    "selenium-webdriver": "^4.8.2"
+  }
+}
