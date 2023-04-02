@@ -2,6 +2,7 @@ const { By, Key, Builder, until } = require("selenium-webdriver");
 require("chromedriver");
 const prompt = require("prompt-sync")();
 const fs = require("fs");
+
 require("./constants");
 
 const readline = require("readline");
@@ -19,7 +20,7 @@ const DISTRICT = "TKY";
 const sDS = "Tất cả";
 
 const START = "01032023";
-const END = "01042023";
+const END = "02042023";
 
 // FIELD
 const FIELD_USERNAME = "txtUserName";
@@ -29,15 +30,16 @@ const FIELD_PASSWORD = "txtPassword";
 const BUTTON_SUBMIT = "DONE";
 
 // VARRIABLE
-const listUser = [768484768, 905406331, 775472600, 905817098];
+const listUser = [934710848, 704636326, 795788065, 935428604, 768432190];
 const timeOut = 10000;
+const logs = [];
 //------fUNCTION-------//
 
 //---------------//
 
 //-------SIGN IN--------//
 
-async function SignIn(driver) {
+async function signIn(driver) {
   try {
     await driver.findElement(By.name("txtUserName")).sendKeys(USERNAME || "");
     await driver.findElement(By.name("txtPassword")).sendKeys(PASSWORD || "");
@@ -66,22 +68,34 @@ async function AutoFilter(driver) {
     // Chọn Huyện
     await driver.findElement(By.id("pDistrict")).sendKeys(DISTRICT);
   } catch (e) {
-    console.log("DEBUG -->", "Lỗi không tìm thấy trường thông tin", e);
+    console.log("DEBUG -->", "Lỗi không tìm thấy trường thông tin trong filter", e);
     return;
   }
 }
 //-------GET USER DETAIL--------//
 async function getUserDetail(driver, user, table) {
-  let isdnField = await driver.findElement(By.id("pIsdn"));
-  isdnField.clear();
-  isdnField.sendKeys(user);
-  await driver.findElement(By.name("btnSearch")).click();
-  await driver.manage().setTimeouts({ implicit: 500 });
   try {
-    await driver.findElement(By.xpath("//table[@id='example']//tbody//tr//td[2]//a")).click();
+    let isdnField = await driver.findElement(By.id("pIsdn"));
+    isdnField.clear();
+    isdnField.sendKeys(user);
+    await driver.findElement(By.name("btnSearch")).click();
+  } catch (e) {
+    console.log("DEBUG -->", "Trường filter ISDN không nằm trong màn hình");
+    return 1;
+  }
+  await driver.manage().setTimeouts({ implicit: 2000 });
+  try {
+    let userData = await driver.wait(
+      until.elementLocated(By.xpath("//table[@id='example']//tbody//tr//td[2]//a")),
+      3000
+    );
+    // await driver.findElement(By.xpath("//table[@id='example']//tbody//tr//td[2]//a")).click();
+    await userData.click();
     return 0;
   } catch (e) {
-    console.log("DEBUG -->", "Trường thông tin user không tồn tại");
+    let message = `isdn : ${user} đã duyệt hoặc không tồn tại trong danh sách`;
+    logs.push(message);
+    console.log("DEBUG -->", "Không tìm thấy user sau khi filter");
     return 1;
   }
 }
@@ -91,9 +105,17 @@ async function handleUserDetail(driver, curUser) {
   let i;
   let tabs = await driver.getAllWindowHandles();
   let j = 0;
-  let res = { code: 1 };
+  let res = { code: "0" };
+  let userName;
   try {
-    await driver.findElement(By.id("pEmployee")).sendKeys("C3_DANGKY");
+    await driver.switchTo().window(tabs[tabs.length - 1]);
+    let employeeDropDown = await driver.wait(until.elementLocated(By.id("pEmployee")), 3000);
+    employeeDropDown.sendKeys("C3_DANGKY");
+    userNameField = await driver.wait(until.elementLocated(By.id("NAME_New")), 3000).catch((e) => {
+      console.log("DEBUG -->", "Không lấy được tên khách hàng");
+    });
+    userName = await userNameField.getAttribute("value");
+    // await driver.findElement(By.id("pEmployee")).sendKeys("C3_DANGKY");
     while (i !== 0 && j < 3) {
       await driver.switchTo().window(tabs[tabs.length - 1]);
       await driver.findElement(By.id("btnHistory")).click();
@@ -101,31 +123,69 @@ async function handleUserDetail(driver, curUser) {
       j++;
     }
   } catch (e) {
-    console.log("DEBUG -->", "Trường thông tin không tồn tại");
+    console.log("DEBUG -->", "Không nằm trong màn hình user detail");
+    console.log("DEBUG -->", e?.message || e);
+    return;
   }
   await driver.switchTo().window(tabs[tabs.length - 1]);
-  // Trường hợp hồ sơ vàng
+
   try {
     let code = res?.code.replace(/\s/g, "");
+    if (code === "0") {
+      console.log("DEBUG -->", "Không lấy được thông tin đối soát ở màn hình lịch sử dịch vụ");
+      return;
+    }
+    // Trường hợp hồ sơ vàng
     if (code == "2" && i == 0) {
-      await handleApprove(driver);
-    } else {
-      console.log("DEBUG -->", "Trường hợp đặc biệt :", `Trạng thái hồ sơ : ${code}`, `isdn : ${curUser}`, "Duyệt tay");
+      await handleApprove(driver, { name: userName, isdn: curUser }, code);
+    }
+    // Trường hợp hồ sơ xanh hoặc đỏ
+    else {
+      let message = `isdn: ${curUser}, name: ${userName} trường hợp đặc biệt không duyệt tự động`;
+      logs.push(message);
+      console.log(
+        "DEBUG -->",
+        "Trường hợp đặc biệt :",
+        `Trạng thái hồ sơ : ${code}`,
+        `isdn : ${curUser}`,
+        `name : ${userName}`,
+        "Duyệt tay"
+      );
+      await driver.close();
+      await driver.switchTo().window(tabs[tabs.length - 2]);
     }
   } catch (e) {
-    console.log("DEBUG -->", "Có lỗi khi duyệt", e);
+    console.log("DEBUG -->", `Có lỗi khi duyệt`, { isdn: curUser, name: userName }, e);
+    let message = `isdn: ${curUser}, name: ${userName} lỗi không duyệt được`;
+    logs.push(message);
+    return;
   }
 }
 //-------HANDLE APPROVE--------//
-async function handleApprove(driver, user) {
+async function handleApprove(driver, user, code) {
   let tabs = await driver.getAllWindowHandles();
   await driver.findElement(By.id("btnApprove")).click();
   await driver.wait(until.alertIsPresent());
   let alert = await driver.switchTo().alert();
   await alert.accept();
-  console.log("DEBUG -->", `Trạng thái hồ sơ : ${code}`, `isdn : ${curUser}`, "Đã duyệt");
-  await driver.close();
-  await driver.switchTo().window(tabs[tabs.length - 1]);
+
+  await driver.wait(until.alertIsPresent());
+  let alert_res = await driver.switchTo().alert();
+  let res_text = await alert_res.getText();
+  await alert_res.accept();
+  if (res_text.includes("E000")) {
+    console.log("DEBUG -->", `Trạng thái hồ sơ : ${code}`, `isdn : ${user.isdn} name : ${user.name}`, "Đã duyệt");
+    let message = `isdn: ${user.isdn}, name: ${user.name} dã duyệt`;
+    logs.push(message);
+    await driver.close();
+    await driver.switchTo().window(tabs[tabs.length - 2]);
+  } else {
+    console.log("DEBUG -->", `Trạng thái hồ sơ : ${code}`, `isdn : ${user.isdn} name : ${user.name}`, res_text);
+    let message = `isdn: ${user.isdn}, name: ${user.name} ${res_text}`;
+    logs.push(message);
+    await driver.close();
+    await driver.switchTo().window(tabs[tabs.length - 2]);
+  }
 }
 //-------HANDLE HISTORY DETAIL--------//
 async function handleHistoryDetail(driver, res) {
@@ -140,7 +200,7 @@ async function handleHistoryDetail(driver, res) {
   } catch (e) {
     try {
       await driver.findElement(By.xpath("//input[@class='btn']")).click();
-      await SignIn(driver);
+      await signIn(driver);
       await driver.close();
       return 1;
     } catch (e) {
@@ -150,30 +210,11 @@ async function handleHistoryDetail(driver, res) {
     }
   }
 }
-//-------SWITCH NEW TAB--------//
-
-function switchToNewestTabs(driver, numTab, maxTime) {
-  let i = 1;
-  let checkTabs = setInterval(async function () {
-    if (i === maxTime / 1000) {
-      clearInterval(checkTabs);
-    }
-    let tabs = await driver.getAllWindowHandles();
-    console.log("DEBUG -->", tabs.length);
-    let newTab = tabs?.[numTab];
-    if (newTab) {
-      console.log("DEBUG -->", 1);
-      driver.switchTo().window(newTab);
-      clearInterval(checkTabs);
-    }
-
-    i++;
-  }, 1000);
-}
 
 //-------AUTOMATION--------//
 
 async function automationFill() {
+  const start = performance.now();
   let driver = await new Builder().forBrowser("chrome").build();
   let searchUrl = WEB_URL;
   await driver.get(searchUrl);
@@ -182,7 +223,7 @@ async function automationFill() {
   // run selenium
 
   // step 1 : sign in
-  await SignIn(driver);
+  await signIn(driver);
 
   //step 2 : Chon Duyet Ho so
   try {
@@ -199,7 +240,7 @@ async function automationFill() {
 
   let table = await driver.findElement(By.id("example"));
   for (let index = 0; index < listUser.length; index++) {
-    console.log("DEBUG -->", 0);
+    console.log("DEBUG -->", index, listUser[index]);
     let tabs = await driver.getAllWindowHandles();
     let user = listUser[index];
 
@@ -208,10 +249,8 @@ async function automationFill() {
 
     // step 4 : Thực hiện duyệt khi chuyển sang tab chi tiết hồ sơ
     if (flag === 0) {
-      console.log("DEBUG -->", 1);
-      await driver.manage().setTimeouts({ implicit: 500 });
-      await driver.switchTo().window(tabs[tabs.length - 1]);
-      await handleUserDetail(driver);
+      await driver.manage().setTimeouts({ implicit: 2000 });
+      await handleUserDetail(driver, user);
     }
   }
 
@@ -219,7 +258,15 @@ async function automationFill() {
 
   process.stdin.on("keypress", (str, key) => {
     if (key.name == "space") {
+      console.log("DEBUG -->", "DONE ALL THE LIST OF CUSTOMER");
+      let k = 1;
+      for (message of logs) {
+        console.log("DEBUG --> ", `${k}. ${message}`);
+        k++;
+      }
       driver.quit();
+      const end = performance.now();
+      console.log(`Execution time: ${end - start} ms`);
     }
     if (key.name == "e") {
       process.exit();
@@ -228,4 +275,5 @@ async function automationFill() {
 }
 
 //----------RUNNING-----------//
+
 automationFill();
