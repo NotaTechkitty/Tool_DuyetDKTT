@@ -4,6 +4,7 @@ const prompt = require("prompt-sync")();
 const fs = require("fs");
 
 require("./constants");
+const auth = require("./Helper-function/auth.js");
 
 const readline = require("readline");
 readline.emitKeypressEvents(process.stdin);
@@ -12,6 +13,7 @@ process.stdin.setRawMode(true);
 // INFO
 const WEB_URL = "https://qlkh.mobifone.vn/DUYETHOSO";
 const HOSO_URL = "mc_sub_lack_info.jsp";
+
 const USERNAME = "C3_THIENLMN";
 const PASSWORD = "abcd@1234";
 
@@ -30,7 +32,7 @@ const FIELD_PASSWORD = "txtPassword";
 const BUTTON_SUBMIT = "DONE";
 
 // VARRIABLE
-const listUser = [934710848, 704636326, 795788065, 935428604, 768432190];
+const listUser = [788632641, 931447819];
 const timeOut = 10000;
 const logs = [];
 //------fUNCTION-------//
@@ -74,28 +76,55 @@ async function AutoFilter(driver) {
 }
 //-------GET USER DETAIL--------//
 async function getUserDetail(driver, user, table) {
+  await driver
+    .findElement(By.id("pIsdn"))
+    .then(async (res) => {
+      await res.clear();
+      await res.sendKeys(user);
+      await driver
+        .findElement(By.name("btnSearch"))
+        .click()
+        .then(() => {
+          console.log("DEBUG -->", 1);
+        });
+    })
+    // await isdnField.clear();
+    // await isdnField.sendKeys(user);
+    // await driver.findElement(By.name("btnSearch")).click();
+    .catch((e) => {
+      console.log("DEBUG -->", "Trường filter ISDN không nằm trong màn hình");
+      return 1;
+    });
+
   try {
-    let isdnField = await driver.findElement(By.id("pIsdn"));
-    isdnField.clear();
-    isdnField.sendKeys(user);
-    await driver.findElement(By.name("btnSearch")).click();
-  } catch (e) {
-    console.log("DEBUG -->", "Trường filter ISDN không nằm trong màn hình");
-    return 1;
-  }
-  await driver.manage().setTimeouts({ implicit: 2000 });
-  try {
-    let userData = await driver.wait(
-      until.elementLocated(By.xpath("//table[@id='example']//tbody//tr//td[2]//a")),
-      3000
-    );
-    // await driver.findElement(By.xpath("//table[@id='example']//tbody//tr//td[2]//a")).click();
-    await userData.click();
+    await driver
+      .wait(until.elementLocated(By.xpath("//table[@id='example']//tbody//tr//td[2]//a")), 3000)
+      .then(async (res) => {
+        await driver
+          .wait(async () => {
+            let isdnTxt = await res.findElement(By.xpath(".//font")).getText();
+            console.log("DEBUG -->", isdnTxt, user);
+            return +isdnTxt === user;
+          }, 3000)
+          .catch((e) => {
+            console.log("DEBUG -->", "Không thể thay đổi dữ liệu");
+          });
+
+        // console.log("DEBUG -->", isdnTxt, user);
+        await res.click().then(() => {
+          console.log("DEBUG -->", 2);
+        });
+      });
+
+    // await userData.click().then(() => {
+    //   console.log("DEBUG -->", 2);
+    // });
+    // await driver.manage().setTimeouts({ implicit: 2000 });
     return 0;
   } catch (e) {
     let message = `isdn : ${user} đã duyệt hoặc không tồn tại trong danh sách`;
     logs.push(message);
-    console.log("DEBUG -->", "Không tìm thấy user sau khi filter");
+    console.log("DEBUG -->", "Không tìm thấy user sau khi filter", e);
     return 1;
   }
 }
@@ -107,14 +136,36 @@ async function handleUserDetail(driver, curUser) {
   let j = 0;
   let res = { code: "0" };
   let userName;
+  let cccdNumber;
   try {
     await driver.switchTo().window(tabs[tabs.length - 1]);
+
+    // XỬ LÝ NVPT
     let employeeDropDown = await driver.wait(until.elementLocated(By.id("pEmployee")), 3000);
     employeeDropDown.sendKeys("C3_DANGKY");
-    userNameField = await driver.wait(until.elementLocated(By.id("NAME_New")), 3000).catch((e) => {
-      console.log("DEBUG -->", "Không lấy được tên khách hàng");
+
+    // XỬ LÝ TÊN KHÁCH HÀNG
+    let userNameField = await driver.wait(until.elementLocated(By.id("NAME_New")), 3000).catch((e) => {
+      console.log("DEBUG -->", "Không lấy được tên khách hàng", curUser);
     });
     userName = await userNameField.getAttribute("value");
+
+    // XỬ LÝ CMND/CCCD
+    try {
+      let cccdNumberField = await driver.wait(until.elementLocated(By.id("ID_NO_New")), 3000);
+      cccdNumber = await cccdNumberField.getAttribute("value");
+      if (cccdNumber.length === 12) {
+        await driver
+          .findElement(By.id("ID_ISSUE_PLACE_New"))
+          .sendKeys("CCC")
+          .catch((e) => {
+            console.log("DEBUG -->", "Không chọn được nơi cấp");
+          });
+      }
+    } catch (e) {
+      console.log("DEBUG -->", "Không lấy được thông tin cccd", curUser);
+    }
+
     // await driver.findElement(By.id("pEmployee")).sendKeys("C3_DANGKY");
     while (i !== 0 && j < 3) {
       await driver.switchTo().window(tabs[tabs.length - 1]);
@@ -217,15 +268,21 @@ async function automationFill() {
   const start = performance.now();
   let driver = await new Builder().forBrowser("chrome").build();
   let searchUrl = WEB_URL;
+
   await driver.get(searchUrl);
   //   let argument = process.argv;
 
   // run selenium
 
   // step 1 : sign in
-  await signIn(driver);
+  try {
+    await signIn(driver);
+  } catch (e) {
+    console.log("DEBUG -->", "Không thể đăng nhập website");
+    return;
+  }
 
-  //step 2 : Chon Duyet Ho so
+  // //step 2 : Chon Duyet Ho so
   try {
     await driver.findElement(By.xpath('//a[@href="' + HOSO_URL + '"]')).click();
   } catch (e) {
@@ -243,29 +300,27 @@ async function automationFill() {
     console.log("DEBUG -->", index, listUser[index]);
     let tabs = await driver.getAllWindowHandles();
     let user = listUser[index];
-
     // await driver.switchTo().window(tabs[tabs.length - 1]);
+    await driver.manage().setTimeouts({ implicit: 100 });
     let flag = await getUserDetail(driver, user, table);
 
     // step 4 : Thực hiện duyệt khi chuyển sang tab chi tiết hồ sơ
     if (flag === 0) {
-      await driver.manage().setTimeouts({ implicit: 2000 });
+      // await driver.manage().setTimeouts({ implicit: 2000 });
       await handleUserDetail(driver, user);
     }
   }
-
   // run command key
-
+  console.log("DEBUG -->", "DONE ALL THE LIST OF CUSTOMER");
+  const end = performance.now();
   process.stdin.on("keypress", (str, key) => {
     if (key.name == "space") {
-      console.log("DEBUG -->", "DONE ALL THE LIST OF CUSTOMER");
       let k = 1;
       for (message of logs) {
         console.log("DEBUG --> ", `${k}. ${message}`);
         k++;
       }
       driver.quit();
-      const end = performance.now();
       console.log(`Execution time: ${end - start} ms`);
     }
     if (key.name == "e") {
