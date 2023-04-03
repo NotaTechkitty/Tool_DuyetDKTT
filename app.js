@@ -5,6 +5,7 @@ const fs = require("fs");
 
 require("./constants");
 const auth = require("./Helper-function/auth.js");
+const helper = require("./Helper-function/function");
 
 const readline = require("readline");
 readline.emitKeypressEvents(process.stdin);
@@ -14,16 +15,6 @@ process.stdin.setRawMode(true);
 const WEB_URL = "https://qlkh.mobifone.vn/DUYETHOSO";
 const HOSO_URL = "mc_sub_lack_info.jsp";
 
-const USERNAME = "C3_THIENLMN";
-const PASSWORD = "abcd@1234";
-
-const PROVINCE = "QNA";
-const DISTRICT = "TKY";
-const sDS = "Tất cả";
-
-const START = "01032023";
-const END = "02042023";
-
 // FIELD
 const FIELD_USERNAME = "txtUserName";
 const FIELD_PASSWORD = "txtPassword";
@@ -32,102 +23,11 @@ const FIELD_PASSWORD = "txtPassword";
 const BUTTON_SUBMIT = "DONE";
 
 // VARRIABLE
-const listUser = [788632641, 931447819];
+const listUser = [932543983, 775014794, 795543133];
 const timeOut = 10000;
 const logs = [];
 //------fUNCTION-------//
 
-//---------------//
-
-//-------SIGN IN--------//
-
-async function signIn(driver) {
-  try {
-    await driver.findElement(By.name("txtUserName")).sendKeys(USERNAME || "");
-    await driver.findElement(By.name("txtPassword")).sendKeys(PASSWORD || "");
-    await driver.findElement(By.name("DONE")).click();
-  } catch (e) {
-    driver.close();
-  }
-}
-
-//--------AUTO FILTER-------//
-async function AutoFilter(driver) {
-  try {
-    // Chọn Tỉnh
-    await driver.findElement(By.id("pProvince")).sendKeys(PROVINCE);
-
-    //Chọn Danh sách
-    await driver.findElement(By.id("pDS")).sendKeys(sDS);
-
-    // Chọn ngày bắt đầu
-    await driver.findElement(By.id("pfromDate")).sendKeys(START);
-
-    // Chọn ngày kết thúc
-    await driver.findElement(By.id("pToDate")).sendKeys(END);
-
-    await driver.manage().setTimeouts({ implicit: 100 });
-    // Chọn Huyện
-    await driver.findElement(By.id("pDistrict")).sendKeys(DISTRICT);
-  } catch (e) {
-    console.log("DEBUG -->", "Lỗi không tìm thấy trường thông tin trong filter", e);
-    return;
-  }
-}
-//-------GET USER DETAIL--------//
-async function getUserDetail(driver, user, table) {
-  await driver
-    .findElement(By.id("pIsdn"))
-    .then(async (res) => {
-      await res.clear();
-      await res.sendKeys(user);
-      await driver
-        .findElement(By.name("btnSearch"))
-        .click()
-        .then(() => {
-          console.log("DEBUG -->", 1);
-        });
-    })
-    // await isdnField.clear();
-    // await isdnField.sendKeys(user);
-    // await driver.findElement(By.name("btnSearch")).click();
-    .catch((e) => {
-      console.log("DEBUG -->", "Trường filter ISDN không nằm trong màn hình");
-      return 1;
-    });
-
-  try {
-    await driver
-      .wait(until.elementLocated(By.xpath("//table[@id='example']//tbody//tr//td[2]//a")), 3000)
-      .then(async (res) => {
-        await driver
-          .wait(async () => {
-            let isdnTxt = await res.findElement(By.xpath(".//font")).getText();
-            console.log("DEBUG -->", isdnTxt, user);
-            return +isdnTxt === user;
-          }, 3000)
-          .catch((e) => {
-            console.log("DEBUG -->", "Không thể thay đổi dữ liệu");
-          });
-
-        // console.log("DEBUG -->", isdnTxt, user);
-        await res.click().then(() => {
-          console.log("DEBUG -->", 2);
-        });
-      });
-
-    // await userData.click().then(() => {
-    //   console.log("DEBUG -->", 2);
-    // });
-    // await driver.manage().setTimeouts({ implicit: 2000 });
-    return 0;
-  } catch (e) {
-    let message = `isdn : ${user} đã duyệt hoặc không tồn tại trong danh sách`;
-    logs.push(message);
-    console.log("DEBUG -->", "Không tìm thấy user sau khi filter", e);
-    return 1;
-  }
-}
 //-------HANDLE USER DETAIL--------//
 
 async function handleUserDetail(driver, curUser) {
@@ -137,6 +37,7 @@ async function handleUserDetail(driver, curUser) {
   let res = { code: "0" };
   let userName;
   let cccdNumber;
+  await driver.sleep(3000);
   try {
     await driver.switchTo().window(tabs[tabs.length - 1]);
 
@@ -157,7 +58,7 @@ async function handleUserDetail(driver, curUser) {
       if (cccdNumber.length === 12) {
         await driver
           .findElement(By.id("ID_ISSUE_PLACE_New"))
-          .sendKeys("CCC")
+          .sendKeys("CCC - Cục CS QLHC về trật tự xã hội")
           .catch((e) => {
             console.log("DEBUG -->", "Không chọn được nơi cấp");
           });
@@ -188,22 +89,29 @@ async function handleUserDetail(driver, curUser) {
     }
     // Trường hợp hồ sơ vàng
     if (code == "2" && i == 0) {
-      await handleApprove(driver, { name: userName, isdn: curUser }, code);
-    }
-    // Trường hợp hồ sơ xanh hoặc đỏ
-    else {
-      let message = `isdn: ${curUser}, name: ${userName} trường hợp đặc biệt không duyệt tự động`;
-      logs.push(message);
-      console.log(
-        "DEBUG -->",
-        "Trường hợp đặc biệt :",
-        `Trạng thái hồ sơ : ${code}`,
-        `isdn : ${curUser}`,
-        `name : ${userName}`,
-        "Duyệt tay"
-      );
-      await driver.close();
-      await driver.switchTo().window(tabs[tabs.length - 2]);
+      let custInfoField = await driver.findElement(By.id("infoCustomer"));
+      let custInfo = await custInfoField.findElement(By.xpath(".//font")).getText();
+      console.log("DEBUG -->", custInfo);
+      if (custInfo.includes("Thuê bao thứ 4 trở lên cần nhập số hợp đồng")) {
+        console.log("DEBUG -->", true);
+      }
+      // await helper.handleApprove(driver, { name: userName, isdn: curUser }, code, logs);
+
+      // Trường hợp hồ sơ xanh hoặc đỏ
+      else {
+        let message = `isdn: ${curUser}, name: ${userName} trường hợp đặc biệt không duyệt tự động`;
+        logs.push(message);
+        console.log(
+          "DEBUG -->",
+          "Trường hợp đặc biệt :",
+          `Trạng thái hồ sơ : ${code}`,
+          `isdn : ${curUser}`,
+          `name : ${userName}`,
+          "Duyệt tay"
+        );
+        await driver.close();
+        await driver.switchTo().window(tabs[tabs.length - 2]);
+      }
     }
   } catch (e) {
     console.log("DEBUG -->", `Có lỗi khi duyệt`, { isdn: curUser, name: userName }, e);
@@ -212,32 +120,7 @@ async function handleUserDetail(driver, curUser) {
     return;
   }
 }
-//-------HANDLE APPROVE--------//
-async function handleApprove(driver, user, code) {
-  let tabs = await driver.getAllWindowHandles();
-  await driver.findElement(By.id("btnApprove")).click();
-  await driver.wait(until.alertIsPresent());
-  let alert = await driver.switchTo().alert();
-  await alert.accept();
 
-  await driver.wait(until.alertIsPresent());
-  let alert_res = await driver.switchTo().alert();
-  let res_text = await alert_res.getText();
-  await alert_res.accept();
-  if (res_text.includes("E000")) {
-    console.log("DEBUG -->", `Trạng thái hồ sơ : ${code}`, `isdn : ${user.isdn} name : ${user.name}`, "Đã duyệt");
-    let message = `isdn: ${user.isdn}, name: ${user.name} dã duyệt`;
-    logs.push(message);
-    await driver.close();
-    await driver.switchTo().window(tabs[tabs.length - 2]);
-  } else {
-    console.log("DEBUG -->", `Trạng thái hồ sơ : ${code}`, `isdn : ${user.isdn} name : ${user.name}`, res_text);
-    let message = `isdn: ${user.isdn}, name: ${user.name} ${res_text}`;
-    logs.push(message);
-    await driver.close();
-    await driver.switchTo().window(tabs[tabs.length - 2]);
-  }
-}
 //-------HANDLE HISTORY DETAIL--------//
 async function handleHistoryDetail(driver, res) {
   let tabs = await driver.getAllWindowHandles();
@@ -251,11 +134,11 @@ async function handleHistoryDetail(driver, res) {
   } catch (e) {
     try {
       await driver.findElement(By.xpath("//input[@class='btn']")).click();
-      await signIn(driver);
+      await helper.signIn(driver);
       await driver.close();
       return 1;
     } catch (e) {
-      console.log("DEBUG -->", "Không mở được trang");
+      console.log("DEBUG -->", "Không mở được trang", e);
       await driver.close();
       return 2;
     }
@@ -276,9 +159,9 @@ async function automationFill() {
 
   // step 1 : sign in
   try {
-    await signIn(driver);
+    await helper.signIn(driver);
   } catch (e) {
-    console.log("DEBUG -->", "Không thể đăng nhập website");
+    console.log("DEBUG -->", "Không thể đăng nhập website", e);
     return;
   }
 
@@ -291,7 +174,7 @@ async function automationFill() {
   // step 3: Chuyển đến chi tiết hồ sơ
 
   //  3.1 : Auto Filter
-  AutoFilter(driver);
+  helper.autoFilter(driver);
 
   // 3.2 : Lặp danh sách thuê bao và chuyển đến chi tiết hồ sơ
 
@@ -302,7 +185,7 @@ async function automationFill() {
     let user = listUser[index];
     // await driver.switchTo().window(tabs[tabs.length - 1]);
     await driver.manage().setTimeouts({ implicit: 100 });
-    let flag = await getUserDetail(driver, user, table);
+    let flag = await helper.handleGetUserDetail(driver, user, table, logs);
 
     // step 4 : Thực hiện duyệt khi chuyển sang tab chi tiết hồ sơ
     if (flag === 0) {
