@@ -23,7 +23,7 @@ const FIELD_PASSWORD = "txtPassword";
 const BUTTON_SUBMIT = "DONE";
 
 // VARRIABLE
-const listUser = [769632580];
+const listUser = [795702077, 766686717, 932557974, 798715679, 766774822, 774514484];
 const timeOut = 10000;
 const logs = [];
 //------fUNCTION-------//
@@ -67,7 +67,6 @@ async function handleUserDetail(driver, curUser) {
       console.log("DEBUG -->", "Không lấy được thông tin cccd", curUser);
     }
 
-    // await driver.findElement(By.id("pEmployee")).sendKeys("C3_DANGKY");
     while (i !== 0 && j < 3) {
       await driver.switchTo().window(tabs[tabs.length - 1]);
       await driver.findElement(By.id("btnHistory")).click();
@@ -80,7 +79,6 @@ async function handleUserDetail(driver, curUser) {
     return;
   }
   await driver.switchTo().window(tabs[tabs.length - 1]);
-
   try {
     let code = res?.code.replace(/\s/g, "");
     if (code === "0") {
@@ -99,6 +97,12 @@ async function handleUserDetail(driver, curUser) {
     }
     // Trường hợp hồ sơ xanh hoặc đỏ
     else {
+      // Trường hợp trùng tên và cmnd/cccd, ngày sinh
+      // let dateOfBirth = driver.findElement(By.id("BIRTH_DATE_New")).getAttribute("value");
+      // if (res?.userName === userName && res?.userId === cccdNumber && res?.dateOfBirth === dateOfBirth) {
+      //   helper.handleDismiss(driver, { name: userName, isdn: curUser }, code, logs, "Đã DKTT");
+      // }
+      // Trường hợp khác
       let message = `isdn: ${curUser}, name: ${userName} trường hợp đặc biệt không duyệt tự động`;
       logs.push(message);
       console.log(
@@ -124,10 +128,16 @@ async function handleUserDetail(driver, curUser) {
 async function handleHistoryDetail(driver, res) {
   let tabs = await driver.getAllWindowHandles();
   await driver.switchTo().window(tabs[tabs.length - 1]);
-  // await driver.manage().setTimeouts({ implicit: 500 });
+  await driver.sleep(500);
   try {
-    let txt = await driver.findElement(By.xpath("//p//table//tbody//tr[22]//td[2]")).getText();
-    res.code = txt;
+    let codeTxt = await driver.findElement(By.xpath("//p//table//tbody//tr[22]//td[2]")).getText();
+    let NameTxt = await driver.findElement(By.xpath("//p//table//tbody//tr[4]//td[2]")).getText();
+    let DateOfBirth = await driver.findElement(By.xpath("//p//table//tbody//tr[9]//td[6]")).getText();
+    let cccdTxt = await driver.findElement(By.xpath("//p//table//tbody//tr[6]//td[2]")).getText();
+    res.code = codeTxt;
+    res.userName = NameTxt;
+    res.dateOfBirth = DateOfBirth;
+    res.userId = cccdTxt;
     await driver.close();
     return 0;
   } catch (e) {

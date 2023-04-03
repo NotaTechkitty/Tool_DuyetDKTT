@@ -6,12 +6,7 @@ async function getUserDetail(driver, user, table, logs) {
     .then(async (res) => {
       await res.clear();
       await res.sendKeys(user);
-      await driver
-        .findElement(By.name("btnSearch"))
-        .click()
-        .then(() => {
-          console.log("DEBUG -->", 1);
-        });
+      await driver.findElement(By.name("btnSearch")).click();
     })
     // await isdnField.clear();
     // await isdnField.sendKeys(user);
