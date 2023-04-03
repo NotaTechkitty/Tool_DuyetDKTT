@@ -23,7 +23,7 @@ const FIELD_PASSWORD = "txtPassword";
 const BUTTON_SUBMIT = "DONE";
 
 // VARRIABLE
-const listUser = [932543983, 775014794, 795543133];
+const listUser = [769632580];
 const timeOut = 10000;
 const logs = [];
 //------fUNCTION-------//
@@ -89,29 +89,28 @@ async function handleUserDetail(driver, curUser) {
     }
     // Trường hợp hồ sơ vàng
     if (code == "2" && i == 0) {
+      // Xử lý trường hợp có hợp đồng số
       let custInfoField = await driver.findElement(By.id("infoCustomer"));
       let custInfo = await custInfoField.findElement(By.xpath(".//font")).getText();
-      console.log("DEBUG -->", custInfo);
       if (custInfo.includes("Thuê bao thứ 4 trở lên cần nhập số hợp đồng")) {
-        console.log("DEBUG -->", true);
+        await driver.findElement(By.id("CONTRACT_NO_New")).sendKeys("1");
       }
-      // await helper.handleApprove(driver, { name: userName, isdn: curUser }, code, logs);
-
-      // Trường hợp hồ sơ xanh hoặc đỏ
-      else {
-        let message = `isdn: ${curUser}, name: ${userName} trường hợp đặc biệt không duyệt tự động`;
-        logs.push(message);
-        console.log(
-          "DEBUG -->",
-          "Trường hợp đặc biệt :",
-          `Trạng thái hồ sơ : ${code}`,
-          `isdn : ${curUser}`,
-          `name : ${userName}`,
-          "Duyệt tay"
-        );
-        await driver.close();
-        await driver.switchTo().window(tabs[tabs.length - 2]);
-      }
+      await helper.handleApprove(driver, { name: userName, isdn: curUser }, code, logs);
+    }
+    // Trường hợp hồ sơ xanh hoặc đỏ
+    else {
+      let message = `isdn: ${curUser}, name: ${userName} trường hợp đặc biệt không duyệt tự động`;
+      logs.push(message);
+      console.log(
+        "DEBUG -->",
+        "Trường hợp đặc biệt :",
+        `Trạng thái hồ sơ : ${code}`,
+        `isdn : ${curUser}`,
+        `name : ${userName}`,
+        "Duyệt tay"
+      );
+      await driver.close();
+      await driver.switchTo().window(tabs[tabs.length - 2]);
     }
   } catch (e) {
     console.log("DEBUG -->", `Có lỗi khi duyệt`, { isdn: curUser, name: userName }, e);
