@@ -21,8 +21,8 @@ function exportExcelFile(data = []) {
     });
   }
   const newSheet = XLSX.utils.json_to_sheet(data);
-  XLSX.utils.book_append_sheet(workbook, newSheet, "log");
-  XLSX.writeFile(workbook, "download/log.xlsx");
+  XLSX.utils.book_append_sheet(workbook, newSheet, `log_${Date.now()}`);
+  XLSX.writeFile(workbook, `download/log_${Date.now()}.xlsx`);
 }
 
 module.exports = { readExcelFile, exportExcelFile };

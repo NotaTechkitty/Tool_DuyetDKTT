@@ -63,8 +63,8 @@ async function handleUserDetail(driver, curUser) {
     }
     // Xử lý địa chỉ
     let streetInfoField = await driver.wait(until.elementLocated(By.id("RES_STREET_NAME_New")), 3000);
-    let streetInfo = await streetInfoField.getText();
-    console.log("DEBUG -->streetInfo", streetInfo);
+    let streetInfo = await streetInfoField.getAttribute("value");
+    console.log("DEBUG -->", streetInfo);
     while (i !== 0 && j < 3) {
       await driver.switchTo().window(tabs[tabs.length - 1]);
       await driver.findElement(By.id("btnHistory")).click();
@@ -98,19 +98,18 @@ async function handleUserDetail(driver, curUser) {
     // Trường hợp hồ sơ xanh hoặc đỏ
     else {
       // Trường hợp trùng tên và cmnd/cccd, ngày sinh
-      // let dateOfBirth = await driver.findElement(By.id("BIRTH_DATE_New")).getAttribute("value");
-      // let SimilarityUserName = stringSimilarity.compareTwoStrings(res?.userName, userName);
-      // let SimilarityCCCD = stringSimilarity.compareTwoStrings(res?.userId, cccdNumber);
-      // let SimilarityDateOfBirth = stringSimilarity.compareTwoStrings(res?.dateOfBirth.replace(/-/g, "/"), dateOfBirth);
-      // console.log("DEBUG -->", SimilarityDateOfBirth);
-      // if (SimilarityUserName === 1 && SimilarityCCCD === 1 && SimilarityDateOfBirth === 1) {
-      //   return helper.handleDismiss(driver, { name: userName, isdn: curUser }, code, logs, "Đã DKTT");
-      // }
+      let dateOfBirth = await driver.findElement(By.id("BIRTH_DATE_New")).getAttribute("value");
+      let SimilarityUserName = stringSimilarity.compareTwoStrings(res?.userName, userName);
+      let SimilarityCCCD = stringSimilarity.compareTwoStrings(res?.userId, cccdNumber);
+      let SimilarityDateOfBirth = stringSimilarity.compareTwoStrings(res?.dateOfBirth.replace(/-/g, "/"), dateOfBirth);
+      if (SimilarityUserName === 1 && SimilarityCCCD === 1 && SimilarityDateOfBirth === 1) {
+        return helper.handleDismiss(driver, { name: userName, isdn: curUser }, code, logs, "Đã DKTT");
+      }
       // Trường hợp khác
 
       let userNameSimilarity = stringSimilarity.compareTwoStrings(curUser.name, userName);
       let description =
-        userNameSimilarity > 0.8 ? "Trường hợp duyệt bị lặp user name" : "Trường hợp đặc biệt không thể duyệt tự động";
+        userNameSimilarity < 0.8 ? "Trường hợp duyệt bị lặp user name" : "Trường hợp đặc biệt không thể duyệt tự động";
       logs.push({ ISDN: curUser.isdn, NAME: curUser.name, TYPE: code, STATUS: "Chưa duyệt", DESCRIPTION: description });
       console.log(
         "DEBUG -->",
@@ -125,7 +124,13 @@ async function handleUserDetail(driver, curUser) {
     }
   } catch (e) {
     console.log("DEBUG -->", `Có lỗi khi duyệt`, { isdn: curUser, name: userName }, e);
-    logs.push({ ISDN: curUser.isdn, NAME: curUser.name, TYPE: code, STATUS: "Chưa duyệt", DESCRIPTION: "Lỗi không duyệt được" });
+    logs.push({
+      ISDN: curUser.isdn,
+      NAME: curUser.name,
+      TYPE: code,
+      STATUS: "Chưa duyệt",
+      DESCRIPTION: "Lỗi không duyệt được",
+    });
     return;
   }
 }
