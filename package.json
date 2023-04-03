@@ -14,6 +14,8 @@
     "gecko": "^0.0.0",
     "moment": "^2.29.4",
     "prompt-sync": "^4.2.0",
-    "selenium-webdriver": "^4.8.2"
+    "selenium-webdriver": "^4.8.2",
+    "string-similarity": "^4.0.4",
+    "xlsx": "^0.18.5"
   }
 }

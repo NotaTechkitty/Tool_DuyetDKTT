@@ -2,10 +2,12 @@ const { By, Key, Builder, until } = require("selenium-webdriver");
 require("chromedriver");
 const prompt = require("prompt-sync")();
 const fs = require("fs");
+const stringSimilarity = require("string-similarity");
 
 require("./constants");
-const auth = require("./Helper-function/auth.js");
+const auth = require("./Helper-function/auth");
 const helper = require("./Helper-function/function");
+const excel = require("./utils/excel");
 
 const readline = require("readline");
 readline.emitKeypressEvents(process.stdin);
@@ -15,15 +17,8 @@ process.stdin.setRawMode(true);
 const WEB_URL = "https://qlkh.mobifone.vn/DUYETHOSO";
 const HOSO_URL = "mc_sub_lack_info.jsp";
 
-// FIELD
-const FIELD_USERNAME = "txtUserName";
-const FIELD_PASSWORD = "txtPassword";
-
-// BUTTON
-const BUTTON_SUBMIT = "DONE";
-
 // VARRIABLE
-const listUser = [795702077, 766686717, 932557974, 798715679, 766774822, 774514484];
+const listUser = [905890217];
 const timeOut = 10000;
 const logs = [];
 //------fUNCTION-------//
@@ -66,7 +61,10 @@ async function handleUserDetail(driver, curUser) {
     } catch (e) {
       console.log("DEBUG -->", "Không lấy được thông tin cccd", curUser);
     }
-
+    // Xử lý địa chỉ
+    let streetInfoField = await driver.wait(until.elementLocated(By.id("RES_STREET_NAME_New")), 3000);
+    let streetInfo = await streetInfoField.getText();
+    console.log("DEBUG -->streetInfo", streetInfo);
     while (i !== 0 && j < 3) {
       await driver.switchTo().window(tabs[tabs.length - 1]);
       await driver.findElement(By.id("btnHistory")).click();
@@ -93,14 +91,20 @@ async function handleUserDetail(driver, curUser) {
       if (custInfo.includes("Thuê bao thứ 4 trở lên cần nhập số hợp đồng")) {
         await driver.findElement(By.id("CONTRACT_NO_New")).sendKeys("1");
       }
+      // Xử lý trường hợp địa chỉ quá dài
+
       await helper.handleApprove(driver, { name: userName, isdn: curUser }, code, logs);
     }
     // Trường hợp hồ sơ xanh hoặc đỏ
     else {
       // Trường hợp trùng tên và cmnd/cccd, ngày sinh
-      // let dateOfBirth = driver.findElement(By.id("BIRTH_DATE_New")).getAttribute("value");
-      // if (res?.userName === userName && res?.userId === cccdNumber && res?.dateOfBirth === dateOfBirth) {
-      //   helper.handleDismiss(driver, { name: userName, isdn: curUser }, code, logs, "Đã DKTT");
+      // let dateOfBirth = await driver.findElement(By.id("BIRTH_DATE_New")).getAttribute("value");
+      // let SimilarityUserName = stringSimilarity.compareTwoStrings(res?.userName, userName);
+      // let SimilarityCCCD = stringSimilarity.compareTwoStrings(res?.userId, cccdNumber);
+      // let SimilarityDateOfBirth = stringSimilarity.compareTwoStrings(res?.dateOfBirth.replace(/-/g, "/"), dateOfBirth);
+      // console.log("DEBUG -->", SimilarityDateOfBirth);
+      // if (SimilarityUserName === 1 && SimilarityCCCD === 1 && SimilarityDateOfBirth === 1) {
+      //   return helper.handleDismiss(driver, { name: userName, isdn: curUser }, code, logs, "Đã DKTT");
       // }
       // Trường hợp khác
       let message = `isdn: ${curUser}, name: ${userName} trường hợp đặc biệt không duyệt tự động`;
@@ -128,7 +132,6 @@ async function handleUserDetail(driver, curUser) {
 async function handleHistoryDetail(driver, res) {
   let tabs = await driver.getAllWindowHandles();
   await driver.switchTo().window(tabs[tabs.length - 1]);
-  await driver.sleep(500);
   try {
     let codeTxt = await driver.findElement(By.xpath("//p//table//tbody//tr[22]//td[2]")).getText();
     let NameTxt = await driver.findElement(By.xpath("//p//table//tbody//tr[4]//td[2]")).getText();
@@ -138,6 +141,7 @@ async function handleHistoryDetail(driver, res) {
     res.userName = NameTxt;
     res.dateOfBirth = DateOfBirth;
     res.userId = cccdTxt;
+    await driver.sleep(500);
     await driver.close();
     return 0;
   } catch (e) {
@@ -158,11 +162,16 @@ async function handleHistoryDetail(driver, res) {
 
 async function automationFill() {
   const start = performance.now();
+
+  const inputData = excel.readExcelFile("download/input.xlsx");
+  const inputIsdn = inputData.map((data) => data.isdn);
+
   let driver = await new Builder().forBrowser("chrome").build();
   let searchUrl = WEB_URL;
 
   await driver.get(searchUrl);
   //   let argument = process.argv;
+  // Load input data
 
   // run selenium
 
@@ -188,10 +197,10 @@ async function automationFill() {
   // 3.2 : Lặp danh sách thuê bao và chuyển đến chi tiết hồ sơ
 
   let table = await driver.findElement(By.id("example"));
-  for (let index = 0; index < listUser.length; index++) {
-    console.log("DEBUG -->", index, listUser[index]);
+  for (let index = 0; index < inputIsdn.length; index++) {
+    console.log("DEBUG -->", index, inputIsdn[index]);
     let tabs = await driver.getAllWindowHandles();
-    let user = listUser[index];
+    let user = inputIsdn[index];
     // await driver.switchTo().window(tabs[tabs.length - 1]);
     await driver.manage().setTimeouts({ implicit: 100 });
     let flag = await helper.handleGetUserDetail(driver, user, table, logs);
