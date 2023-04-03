@@ -93,7 +93,7 @@ async function handleUserDetail(driver, curUser) {
       }
       // Xử lý trường hợp địa chỉ quá dài
 
-      await helper.handleApprove(driver, { name: userName, isdn: curUser }, code, logs);
+      await helper.handleApprove(driver, { name: userName, isdn: curUser.isdn }, code, logs);
     }
     // Trường hợp hồ sơ xanh hoặc đỏ
     else {
@@ -107,13 +107,16 @@ async function handleUserDetail(driver, curUser) {
       //   return helper.handleDismiss(driver, { name: userName, isdn: curUser }, code, logs, "Đã DKTT");
       // }
       // Trường hợp khác
-      let message = `isdn: ${curUser}, name: ${userName} trường hợp đặc biệt không duyệt tự động`;
-      logs.push(message);
+
+      let userNameSimilarity = stringSimilarity.compareTwoStrings(curUser.name, userName);
+      let description =
+        userNameSimilarity > 0.8 ? "Trường hợp duyệt bị lặp user name" : "Trường hợp đặc biệt không thể duyệt tự động";
+      logs.push({ ISDN: curUser.isdn, NAME: curUser.name, TYPE: code, STATUS: "Chưa duyệt", DESCRIPTION: description });
       console.log(
         "DEBUG -->",
         "Trường hợp đặc biệt :",
         `Trạng thái hồ sơ : ${code}`,
-        `isdn : ${curUser}`,
+        `isdn : ${curUser.isdn}`,
         `name : ${userName}`,
         "Duyệt tay"
       );
@@ -122,8 +125,7 @@ async function handleUserDetail(driver, curUser) {
     }
   } catch (e) {
     console.log("DEBUG -->", `Có lỗi khi duyệt`, { isdn: curUser, name: userName }, e);
-    let message = `isdn: ${curUser}, name: ${userName} lỗi không duyệt được`;
-    logs.push(message);
+    logs.push({ ISDN: curUser.isdn, NAME: curUser.name, TYPE: code, STATUS: "Chưa duyệt", DESCRIPTION: "Lỗi không duyệt được" });
     return;
   }
 }
@@ -164,7 +166,9 @@ async function automationFill() {
   const start = performance.now();
 
   const inputData = excel.readExcelFile("download/input.xlsx");
-  const inputIsdn = inputData.map((data) => data.isdn);
+  // const inputUser = inputData.map((data) => {
+  //   return { isdn: data.isdn, name: data.name };
+  // });
 
   let driver = await new Builder().forBrowser("chrome").build();
   let searchUrl = WEB_URL;
@@ -197,10 +201,10 @@ async function automationFill() {
   // 3.2 : Lặp danh sách thuê bao và chuyển đến chi tiết hồ sơ
 
   let table = await driver.findElement(By.id("example"));
-  for (let index = 0; index < inputIsdn.length; index++) {
-    console.log("DEBUG -->", index, inputIsdn[index]);
+  for (let index = 0; index < inputData.length; index++) {
+    console.log("DEBUG -->", index, inputData[index]);
     let tabs = await driver.getAllWindowHandles();
-    let user = inputIsdn[index];
+    let user = inputData[index];
     // await driver.switchTo().window(tabs[tabs.length - 1]);
     await driver.manage().setTimeouts({ implicit: 100 });
     let flag = await helper.handleGetUserDetail(driver, user, table, logs);
@@ -213,14 +217,10 @@ async function automationFill() {
   }
   // run command key
   console.log("DEBUG -->", "DONE ALL THE LIST OF CUSTOMER");
+  excel.exportExcelFile(logs);
   const end = performance.now();
   process.stdin.on("keypress", (str, key) => {
     if (key.name == "space") {
-      let k = 1;
-      for (message of logs) {
-        console.log("DEBUG --> ", `${k}. ${message}`);
-        k++;
-      }
       driver.quit();
       console.log(`Execution time: ${end - start} ms`);
     }

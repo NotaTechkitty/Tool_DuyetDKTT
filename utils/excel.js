@@ -11,10 +11,16 @@ function readExcelFile(fileName) {
   return sheetData;
 }
 
-function exportExcelFile(data) {
+function exportExcelFile(data = []) {
   const workbook = XLSX.utils.book_new();
-
-  const newSheet = XLSX.utils.json_to_sheet(data || []);
+  if (data?.[0]) {
+    let i = 0;
+    data = data.map((_data) => {
+      i++;
+      return { STT: i, ..._data };
+    });
+  }
+  const newSheet = XLSX.utils.json_to_sheet(data);
   XLSX.utils.book_append_sheet(workbook, newSheet, "log");
   XLSX.writeFile(workbook, "download/log.xlsx");
 }

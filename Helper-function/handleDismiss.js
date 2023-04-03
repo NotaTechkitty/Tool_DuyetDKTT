@@ -15,14 +15,14 @@ async function handleDismiss(driver, user, code, logs, note) {
   await alert_res.accept();
   if (res_text.includes("E000")) {
     console.log("DEBUG -->", `Trạng thái hồ sơ : ${code}`, `isdn : ${user.isdn} name : ${user.name}`, `Đã hủy với lý do ${note}`);
-    let message = `isdn: ${user.isdn}, name: ${user.name} dã duyệt`;
-    logs.push(message);
+    logs.push({ ISDN: user.isdn, NAME: user.name, TYPE: "1", STATUS: "Đã Hủy", DESCRIPTION: `${note}` });
+
     await driver.close();
     await driver.switchTo().window(tabs[tabs.length - 2]);
   } else {
     console.log("DEBUG -->", `Trạng thái hồ sơ : ${code}`, `isdn : ${user.isdn} name : ${user.name}`, res_text);
-    let message = `isdn: ${user.isdn}, name: ${user.name} ${res_text}`;
-    logs.push(message);
+    logs.push({ ISDN: user.isdn, NAME: user.name, TYPE: "1", STATUS: "Chưa duyệt", DESCRIPTION: `${res_text}` });
+
     await driver.close();
     await driver.switchTo().window(tabs[tabs.length - 2]);
   }

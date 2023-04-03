@@ -5,7 +5,7 @@ async function getUserDetail(driver, user, table, logs) {
     .findElement(By.id("pIsdn"))
     .then(async (res) => {
       await res.clear();
-      await res.sendKeys(user);
+      await res.sendKeys(user.isdn);
       await driver.findElement(By.name("btnSearch")).click();
     })
     // await isdnField.clear();
@@ -21,8 +21,13 @@ async function getUserDetail(driver, user, table, logs) {
     await userDetailLink.click();
     return 0;
   } catch (e) {
-    let message = `isdn : ${user} đã duyệt hoặc không tồn tại trong danh sách`;
-    logs.push(message);
+    logs.push({
+      ISDN: user.isdn,
+      NAME: user.name,
+      TYPE: "Không xác định",
+      STATUS: "Không Duyệt",
+      DESCRIPTION: "Đã duyệt hoặc không tồn tại trong danh sách",
+    });
     console.log("DEBUG -->", "Không tìm thấy user sau khi filter", e);
     return 1;
   }
